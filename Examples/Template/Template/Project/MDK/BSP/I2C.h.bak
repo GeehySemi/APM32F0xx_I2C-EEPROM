@@ -1,0 +1,13 @@
+
+#include "apm32f0xx_i2c.h"
+#include "apm32f0xx_gpio.h"
+#include "apm32f0xx_rcm.h"
+#include "apm32f0xx_misc.h"
+#include "apm32f0xx_eint.h"
+#include "string.h"
+
+void I2CInit(void);
+uint32_t I2C_Write(I2C_T *i2c,uint8_t driver_Addr, uint16_t start_Addr,  uint8_t *Write_Buffer,uint8_t numb);
+
+uint32_t I2C_Read(I2C_T *i2c,uint8_t driver_Addr, uint16_t start_Addr, uint8_t *read_Buffer,uint8_t numb);
+

@@ -1,0 +1,5 @@
+--c99 --gnu -c --cpu Cortex-M0+ -D__MICROLIB -g -O0 --apcs=interwork --split_sections -I ..\..\..\..\..\Library\APM32F0xx_StdPeriphDriver\inc -I ..\..\..\..\..\Library\CMSIS\Include -I ..\..\..\..\..\Library\Device\Geehy\APM32F0xx\Include -I ..\..\..\..\..\Board -I ..\..\Include -I .\BSP
+-ID:\Users\geehy\AppData\Local\Arm\Packs\Geehy\APM32F0xx_DFP\1.0.7\Device\Device\Geehy\APM32F0xx\Include
+-ID:\Users\geehy\AppData\Local\Arm\Packs\Geehy\APM32F0xx_DFP\1.0.7\Device\Include
+-D__UVISION_VERSION="535" -DAPM32F072XB -DBOARD_APM32F072_MINI -DAPM32F072xB
+-o .\out\apm32f072\eeprom_24c02.o --omf_browse .\out\apm32f072\eeprom_24c02.crf --depend .\out\apm32f072\eeprom_24c02.d "EEPROM_24C02.c"

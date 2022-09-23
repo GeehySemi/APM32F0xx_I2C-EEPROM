@@ -1,0 +1,9 @@
+.\out\apm32f072\apm32f0xx_int.o: ..\..\Source\apm32f0xx_int.c
+.\out\apm32f072\apm32f0xx_int.o: ..\..\Include\apm32f0xx_int.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\..\..\..\Library\Device\Geehy\APM32F0xx\Include\apm32f0xx.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\..\..\..\Library\CMSIS\Include\core_cm0plus.h
+.\out\apm32f072\apm32f0xx_int.o: C:\MySofaware\MDK\ARM\ARMCC\Bin\..\include\stdint.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\..\..\..\Library\CMSIS\Include\core_cmInstr.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\..\..\..\Library\CMSIS\Include\core_cmFunc.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\..\..\..\Library\Device\Geehy\APM32F0xx\Include\system_apm32f0xx.h
+.\out\apm32f072\apm32f0xx_int.o: ..\..\Include\main.h

@@ -1,0 +1,274 @@
+#ifndef _HH_
+#define _HH_
+
+#include "spi.h"
+#include "main.h"
+#include "apm32f0xx_spi.h"
+#include "apm32f0xx_gpio.h"
+#include "apm32f0xx_dma.h"
+#endif /*_HH_*/
+
+
+
+/*
+ * 功能：SPI 读写一个字节函数    ---》数据交换
+ * 参数：发送一个字节数据
+ * 返回值：返回读取的数据
+*/
+uint16_t spi_read_writeByte(uint8_t TXdata)
+{
+    while(SPI_ReadStatusFlag(SPI2,SPI_FLAG_TXBE) == RESET);   //等待上一次的数据发完
+    SPI_TxData8(SPI2,TXdata);//发送数据
+     
+    while(SPI_ReadStatusFlag(SPI2,SPI_FLAG_RXBNE) == RESET);  //等上次数据接收完
+    return SPI_RxData8(SPI2);//接收数据
+}
+
+//ID
+//0XEF17,W25Q128 	  
+uint16_t w25qxx_read_id(void)
+{
+    uint16_t id = 0;
+     
+	W25QXX_CSL; //片选有效
+     
+    spi_read_writeByte(0x90);   //发送0x90，读取厂商ID和设备ID
+     
+    spi_read_writeByte(0x00);   //发送24位地址(3个字节)  前面两个字节可以任意，第三个字节必须是0x00
+    spi_read_writeByte(0x00);
+    spi_read_writeByte(0x00);   //一定是0x00
+ 
+    //随便发2个字节的数据
+    id |= spi_read_writeByte(0xFF)<<8;  //id：0xEF17  厂商ID：0xEF    
+    id |= spi_read_writeByte(0xFF);     //设备ID：0x17
+	
+		W25QXX_CSH; //片选无效
+     
+    return id;
+}
+
+/*
+ * 功能：w25q128 读取一个字节函数    ---》数据交换
+ * 参数：addr     ----->打算从 addr 这个地址开始读取数据
+         pbuf     ----->你要读取的数据所在的缓冲区
+         lenth    ----->你要读取的字节数
+ * 返回值：返回读取的数据
+*/
+void w25qxx_read_data(uint32_t addr,uint8_t *pbuf,uint32_t lenth)
+{
+    uint8_t *p = pbuf;
+
+		W25QXX_CSL;   //片选有效
+	
+    spi_read_writeByte(0x03);   //发送0x03，读取读取数据
+     
+    //接下来发一个你要读取的24位地址   0xyy123456
+    spi_read_writeByte((addr>>16)&0xFF);    //0x12   发送[23:16]
+    spi_read_writeByte((addr>>8)&0xFF);    //0x34    发送[15:8]
+    spi_read_writeByte((addr>>0)&0xFF);   //0x56    发送[7:0]
+     
+    while(lenth--)
+    {
+        *p++ = spi_read_writeByte(0xFF);    //随意加的，可以改成其它
+    }
+     
+		W25QXX_CSH;     //片选无效
+}
+
+/*
+ * 功能：w25q128  写入一页(256Byte)函数    ---》数据交换
+ * 参数：addr     ----->打算从 addr 这个地址开始擦除
+          
+ * 返回值：无
+*/
+void w25qxx_EraseSector(uint32_t addr)
+{
+
+		W25QXX_CSL;        //片选有效
+      
+    spi_read_writeByte(0x20);   //发送0x20，扇区擦除
+     
+    //接下来发一个你要读取的24位地址   0xyy123456
+    spi_read_writeByte((addr>>16)&0xFF);    //0x12   发送[23:16]
+    spi_read_writeByte((addr>>8)&0xFF);   //0x34    发送[15:8]
+    spi_read_writeByte((addr>>0)&0xFF);   //0x56    发送[7:0]
+     
+		W25QXX_CSH;        //片选无效
+}
+
+
+/*
+ * 功能：w25q128  读取状态寄存器1
+ * 参数：无          
+ * 返回值：状态寄存的值
+*/
+uint8_t w25qxx_read_SR1(void)
+{
+    uint16_t status = 0;
+
+		W25QXX_CSL;   //片选拉低
+
+    spi_read_writeByte(0x05);       //发送0x05，读取状态寄存器1的值   发送0x35，读取状态寄存器2的值
+     
+    status = spi_read_writeByte(0xFF);        //接收数据  就是状态寄存器1+状态寄存器2
+     
+		W25QXX_CSH;       //片选拉高
+     
+    return  status;
+}
+
+void w25qxx_wirte_enable(void)
+{
+
+		W25QXX_CSL;   //片选拉低
+
+    spi_read_writeByte(0x06);   //发送0x06，写使能
+
+		W25QXX_CSH;   //片选拉高
+}
+
+// 判断状态寄存器1的S0为是否为0，值为0则擦除完成
+void w25qxx_wait_busy(void)
+{
+    while((w25qxx_read_SR1()&(0x01<<0)));   //当busy为0，即擦除完毕  当busy为1，即擦除还在继续
+}
+
+/*
+ * 功能：w25q128  写入一页(256Byte)函数    ---》数据交换
+ * 参数：addr     ----->打算从 addr 这个地址开始写入数据
+         pbuf     ----->你要写入的数据所在的缓冲区
+         lenth    ----->你要写入的字节数
+ * 返回值：返回读取的数据
+*/
+void w25qxx_write_page(uint32_t addr,uint8_t *pbuf,uint32_t lenth)
+{
+    uint8_t *p = pbuf;
+
+    w25qxx_wirte_enable();       //擦除之前必须进行写使能
+     
+    //擦除扇区
+    //w25qxx_EraseSector(0x000000);
+    w25qxx_EraseSector(addr/4096*4096);
+
+    w25qxx_wait_busy();   //判忙
+
+    w25qxx_wirte_enable();       //写入必须进行写使能
+     
+    //开始写入数据
+		W25QXX_CSL;   //片选拉低
+
+    spi_read_writeByte(0x02);   //发送0x02，写入数据
+     
+    //接下来发一个要写入的24位地址   0xyy123456
+    spi_read_writeByte((addr>>16)&0xFF);    //0x12   发送[23:16]
+    spi_read_writeByte((addr>>8)&0xFF);    //0x34    发送[15:8]
+    spi_read_writeByte((addr>>0)&0xFF);   //0x56    发送[7:0]
+     
+    while(lenth--)
+    {
+        spi_read_writeByte(*p++);
+    }
+
+		W25QXX_CSH;   //片选拉高
+}
+
+/*
+功能：无检验写入数据,写满一个扇区，自动换页。
+参数：addr     ----->打算从 addr 这个地址开始写入数据
+     pbuf     ----->你要写入的数据所在的缓冲区
+    lenth    ----->你要写入的字节数
+*/
+void w25qxx_NoCheck_write_page(uint32_t addr,uint8_t *pbuf,uint32_t lenth)
+{
+	uint32_t page_remain = 256-addr%256;    //算出开始写入数据的某一页的剩余未写字节数
+	if(page_remain>=lenth)    //该页剩余的空间足够写入这些数据时
+	{
+		page_remain=lenth;    //把写入长度赋值
+	}
+	while(1)
+	{
+		w25qxx_write_page(addr,pbuf,page_remain);
+		if(page_remain==lenth) break;   //判断是否写完，如果剩余的空间足够写入这些数据，就执行一次上面的函数，如果不够则进行下面的语句。
+		
+		addr+=page_remain;    //如果不相等说明len比page_remain大，则地址偏移已经写入的长度
+		pbuf+=page_remain;    //数据偏移
+		lenth-=page_remain;   //总长度减去已经写入的长度
+		if(lenth<256)   //判断剩余长度是否够写一整页，不够就赋值实际剩余长度，够就赋值256
+		{
+			page_remain=lenth;
+		}
+		else
+		{
+			page_remain=256;
+		}
+	}
+}
+
+
+//W25QXX SPI接口定义  PA3->CS 
+void W25QXX_Init(void)
+{ 
+
+	GPIO_Config_T gpioConfig;
+	SPI_Config_T spiConfig;
+
+	
+	/** Enable related Clock */
+	RCM_EnableAPB1PeriphClock(RCM_APB1_PERIPH_SPI2);
+	RCM_EnableAHBPeriphClock(RCM_AHB_PERIPH_GPIOB);
+
+	
+	//PB12
+	gpioConfig.mode =GPIO_MODE_OUT;
+	gpioConfig.outtype =GPIO_OUT_TYPE_PP;
+	gpioConfig.pin =GPIO_PIN_12;
+	gpioConfig.pupd = GPIO_PUPD_NO;
+	gpioConfig.speed = GPIO_SPEED_10MHz;
+	GPIO_Config(GPIOB, &gpioConfig);
+
+	W25QXX_CSH;			     			  //片选无效
+	
+	/* 配置SPI2引脚SCK、MISO 和 MOSI为复用推挽输出模式 */
+	gpioConfig.pin = GPIO_PIN_15 | GPIO_PIN_14 | GPIO_PIN_13;
+	gpioConfig.speed = GPIO_SPEED_50MHz;
+	gpioConfig.mode =GPIO_MODE_OUT;
+	gpioConfig.outtype =GPIO_OUT_TYPE_PP;
+	GPIO_Config(GPIOB, &gpioConfig);
+
+/***************************************************************/
+
+GPIO_ConfigPinAF(GPIOB,GPIO_PIN_SOURCE_12,GPIO_AF_PIN0);
+
+GPIO_ConfigPinAF(GPIOB,GPIO_PIN_SOURCE_13,GPIO_AF_PIN0);
+
+GPIO_ConfigPinAF(GPIOB,GPIO_PIN_SOURCE_14,GPIO_AF_PIN0);
+
+GPIO_ConfigPinAF(GPIOB,GPIO_PIN_SOURCE_15,GPIO_AF_PIN0);
+/***************************************************************/
+
+	SPI_ConfigStructInit(&spiConfig);
+
+	spiConfig.length = SPI_DATA_LENGTH_8B;
+
+	spiConfig.baudrateDiv = SPI_BAUDRATE_DIV_32;
+	/**  2 line full duplex  */
+	spiConfig.direction = SPI_DIRECTION_2LINES_FULLDUPLEX;//双线全双工通信
+	/**  MSB first  */
+	spiConfig.firstBit = SPI_FIRST_BIT_MSB;//高位先出【看从机的数据手册的时序图】
+	/**  MASTER mode  */
+	spiConfig.mode = SPI_MODE_MASTER;//默认是主机角色，主动控制从机
+	/**  Polarity is HIGH  */
+	spiConfig.polarity = SPI_CLKPOL_HIGH; //SPI总线空闲的时候，时钟线为高电平  CPOL=1，【看从机的数据手册的时序图】
+	/**  Software select slave enable  */
+	spiConfig.slaveSelect  = SPI_SSC_ENABLE;
+	/**  Phase is 2 edge  */
+	spiConfig.phase = SPI_CLKPHA_2EDGE; //CPHA = 1,就是主机会对MOSI引脚进行电平采样在时钟的第二个条边沿【看从机的数据手册的时序图】
+	/**  SPI config  */
+	SPI_Config(SPI2, &spiConfig);
+
+	SPI_ConfigDatalength(SPI2, SPI_DATA_LENGTH_8B);
+
+	SPI_Enable(SPI2);
+	
+}  
+
